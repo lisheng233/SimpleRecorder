@@ -143,19 +143,9 @@ downloadUrl = ""       # 可选：含 avifenc 的 zip 地址
 
 ### 文件大小
 
-- AVIF 通常比 GIF 小一个数量级；1280×747、30 FPS 的游戏画面常见为 **每秒几 MB 以内**，具体取决于质量和场景复杂度。
+- AVIF 通常比 GIF 小一个数量级；1280×747、30 FPS 的游戏画面常见为 **每秒几百 KB 以内**，具体取决于质量和场景复杂度。
 - GIF 没有现代视频的帧间压缩，1280×747 / 30 FPS 大约 **6–7 MB/s**，录 1 分钟可能到 400 MB。需要长时间录制请优先用 AVIF。
 
-### 性能与高负载警告
-
-抓帧使用 PBO 异步回读，缩放和编码都在后台线程。估算像素吞吐超过约 4000 万像素/秒，或 60 FPS + 75% 以上缩放时，开始录制会在聊天栏提示高负载。实测：
-
-- 2560×1494 窗口、输出 1280×747、60 FPS、AVIF q40：**0 丢帧**，游戏内 F3 仍显示约 119 FPS。
-- OpenGL YUV 路径、30 FPS、427×240 测试场景：179 帧、**0 丢帧**，画面方向、颜色和 HUD 正确。
-- 多线程 CPU 路径、2560×1494 原始尺寸、60 FPS q60：编码器/CPU 跟不上时约 377 帧被丢弃，但重复上一帧保持时间轴，录制本身没有卡死。
-- 4K 下 PBO 带宽和编码开销会明显增大；如果编码队列满，会丢新帧而不是阻塞游戏。
-
-PBO 只保存 3 个帧缓冲；CPU 缩放线程单线程，避免和游戏抢满所有 CPU。GPU 路径下 YUV 转换在着色器完成；编码器进程线程数限制在最多 8 个。
 
 ---
 
@@ -217,9 +207,3 @@ src/main/java/com/lisheng/simplerecorder/
 `avifenc` 不在 jar 内；首次启动下载到 `config/simplerecorder/avif/<platform>/`。
 
 ---
-
-## 许可
-
-SimpleRecorder 自身代码：MIT，详见 [LICENSE](LICENSE)。
-
-运行时下载的 `avifenc` 来自 libavif 官方发行版，静态链接了 libavif、AOM、dav1d、libyuv、libjpeg-turbo、libpng、zlib 等组件；它们的许可与版权声明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
