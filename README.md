@@ -217,9 +217,3 @@ src/main/java/com/lisheng/simplerecorder/
 `avifenc` 不在 jar 内；首次启动下载到 `config/simplerecorder/avif/<platform>/`。
 
 ---
-
-## 许可
-
-SimpleRecorder 自身代码：**GPL-3.0-only**，详见 [LICENSE](LICENSE)。
-
-运行时下载的 `avifenc` 来自 libavif 官方发行版，静态链接了 libavif、AOM、dav1d、libyuv、libjpeg-turbo、libpng、zlib 等组件；它们的许可与版权声明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
