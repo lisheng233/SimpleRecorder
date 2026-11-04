@@ -1,0 +1,13 @@
+[
+  {
+    "modid": "simplerecorder",
+    "name": "SimpleRecorder",
+    "description": "Press F8 to start or stop recording. Exports animated AVIF by default (30 FPS, 50% size) with GIF as a compatibility fallback. Client-side only.",
+    "version": "${version}",
+    "mcversion": "${mcversion}",
+    "authorList": ["lisheng"],
+    "credits": "Downloads the official libavif avifenc binary at runtime; it is not redistributed inside the jar.",
+    "url": "https://github.com/lisheng233/SimpleRecorder",
+    "logoFile": ""
+  }
+]

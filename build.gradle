@@ -1,0 +1,83 @@
+buildscript {
+    repositories {
+        maven { url = 'https://maven.minecraftforge.net' }
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'net.minecraftforge.gradle:ForgeGradle:3.0.197'
+    }
+}
+
+apply plugin: 'net.minecraftforge.gradle'
+
+version = "1.12.2-0.1.0"
+group = "com.lisheng.simplerecorder"
+archivesBaseName = "simplerecorder"
+
+sourceCompatibility = targetCompatibility = '1.8'
+
+minecraft {
+    // MCP snapshot mapping pinned for 1.12.2.
+    mappings channel: 'snapshot', version: '20171003-1.12'
+
+    runs {
+        client {
+            workingDirectory project.file('run')
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'debug'
+        }
+        server {
+            workingDirectory project.file('run')
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'debug'
+        }
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    minecraft 'net.minecraftforge:forge:1.12.2-14.23.5.2860'
+    testCompile 'org.junit.jupiter:junit-jupiter-api:5.10.2'
+    testCompile 'org.junit.jupiter:junit-jupiter-engine:5.10.2'
+    testRuntime 'org.junit.platform:junit-platform-launcher:1.10.2'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+// ${version}/${mcversion} in mcmod.info must never leak into the packaged jar.
+processResources {
+    inputs.property "version", project.version
+    inputs.property "mcversion", "1.12.2"
+    from(sourceSets.main.resources.srcDirs) {
+        include 'mcmod.info'
+        expand 'version': project.version, 'mcversion': '1.12.2'
+    }
+    from(sourceSets.main.resources.srcDirs) {
+        exclude 'mcmod.info'
+    }
+}
+
+// The published artifact must be reobfuscated or Forge rejects it at load time.
+jar {
+    manifest {
+        attributes([
+                'Specification-Title'     : 'simplerecorder',
+                'Specification-Vendor'    : 'lisheng',
+                'Specification-Version'   : '1',
+                'Implementation-Title'    : project.name,
+                'Implementation-Version'  : project.version,
+                'Implementation-Vendor'   : 'lisheng',
+                'Implementation-Timestamp': new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")
+        ])
+    }
+    finalizedBy('reobfJar')
+}
+
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
+}
