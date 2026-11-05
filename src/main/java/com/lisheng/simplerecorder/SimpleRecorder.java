@@ -16,7 +16,7 @@ import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
  */
 @Mod(modid = SimpleRecorder.MODID,
         name = "SimpleRecorder",
-        version = "1.12.2-0.1.0",
+        version = "1.12.2-1.0.0",
         acceptedMinecraftVersions = "[1.12.2]",
         clientSideOnly = true,
         guiFactory = "com.lisheng.simplerecorder.client.RecorderGuiFactory")
