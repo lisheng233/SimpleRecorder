@@ -44,6 +44,12 @@ public final class ClientEvents {
             InputMappings.Type.KEYSYM,
             GLFW.GLFW_KEY_F9,
             "key.categories.simplerecorder");
+    public static final KeyBinding PAUSE_KEY = new KeyBinding(
+            "key.simplerecorder.pause",
+            KeyConflictContext.IN_GAME,
+            InputMappings.Type.KEYSYM,
+            GLFW.GLFW_KEY_F10,
+            "key.categories.simplerecorder");
 
     private static final RecordingController CONTROLLER = new RecordingController();
     private static long lastConfigModified;
@@ -60,6 +66,7 @@ public final class ClientEvents {
     public static void onClientSetup() {
         ClientRegistry.registerKeyBinding(RECORD_KEY);
         ClientRegistry.registerKeyBinding(CONFIG_KEY);
+        ClientRegistry.registerKeyBinding(PAUSE_KEY);
     }
 
     public static void onConfigReloading(ModConfig.ModConfigEvent event) {
@@ -123,6 +130,9 @@ public final class ClientEvents {
         Minecraft minecraft = Minecraft.getInstance();
         while (RECORD_KEY.consumeClick()) {
             CONTROLLER.toggle(minecraft);
+        }
+        while (PAUSE_KEY.consumeClick()) {
+            CONTROLLER.togglePause(minecraft);
         }
         while (CONFIG_KEY.consumeClick()) {
             minecraft.setScreen(new RecorderConfigScreen(minecraft.screen));
@@ -193,6 +203,8 @@ public final class ClientEvents {
         }
         if (event.getKey() == RECORD_KEY.getKey().getValue()) {
             CONTROLLER.toggle(minecraft);
+        } else if (event.getKey() == PAUSE_KEY.getKey().getValue()) {
+            CONTROLLER.togglePause(minecraft);
         }
     }
 }

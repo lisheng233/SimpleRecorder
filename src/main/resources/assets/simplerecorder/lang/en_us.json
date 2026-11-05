@@ -2,6 +2,7 @@
   "key.categories.simplerecorder": "SimpleRecorder",
   "key.simplerecorder.record": "Start / Stop Recording",
   "key.simplerecorder.config": "Open SimpleRecorder Settings",
+  "key.simplerecorder.pause": "Pause / Resume Recording",
 
   "message.simplerecorder.started": "Recording started (%s FPS, %s%% size)",
   "message.simplerecorder.exporting": "Stopping recording and exporting...",
@@ -11,6 +12,8 @@
   "message.simplerecorder.capture_error": "Frame capture failed: %s",
   "message.simplerecorder.no_world": "Join a world before recording.",
   "message.simplerecorder.busy": "Still exporting the previous recording...",
+  "message.simplerecorder.paused": "Recording paused (F10 resumes, F8 stops and exports).",
+  "message.simplerecorder.resumed": "Recording resumed.",
   "message.simplerecorder.resize": "The window size changed; recording was stopped and exported.",
   "message.simplerecorder.auto_stop": "Left the world; recording was stopped and exported.",
   "message.simplerecorder.path_error": "Could not create the screenshots folder: %s",

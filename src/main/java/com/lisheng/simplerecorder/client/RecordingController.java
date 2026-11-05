@@ -52,9 +52,11 @@ public final class RecordingController {
     private boolean warnedHigh;
     private long startNanos;
     private long nextCaptureNanos;
+    private long pausedNanos;
+    private long pauseStartedNanos;
 
     public void toggle(Minecraft minecraft) {
-        if (state == State.RECORDING) {
+        if (state == State.RECORDING || state == State.PAUSED) {
             stop(minecraft, new TranslationTextComponent("message.simplerecorder.exporting"));
         } else if (state == State.IDLE) {
             start(minecraft);
@@ -64,7 +66,8 @@ public final class RecordingController {
     }
 
     public void tick(Minecraft minecraft) {
-        if (state == State.RECORDING && (minecraft.level == null || minecraft.player == null)) {
+        if ((state == State.RECORDING || state == State.PAUSED)
+                && (minecraft.level == null || minecraft.player == null)) {
             stop(minecraft, new TranslationTextComponent("message.simplerecorder.auto_stop"));
         }
     }
@@ -124,7 +127,7 @@ public final class RecordingController {
      * ready. Scaling happened on the PBO worker; only the handoff runs here.
      */
     private void onCapturedFrame(ScaledFrame frame) {
-        if (state != State.RECORDING || encoder == null) {
+        if ((state != State.RECORDING && state != State.PAUSED) || encoder == null) {
             releaseFrame(frame);
             return;
         }
@@ -136,7 +139,10 @@ public final class RecordingController {
             return;
         }
 
-        if (!encoder.offer(frame)) {
+        ScaledFrame offered = pausedNanos == 0L ? frame : new ScaledFrame(
+                frame.pixels(), frame.width(), frame.height(),
+                frame.captureNanos() - pausedNanos, frame.yuv());
+        if (!encoder.offer(offered)) {
             droppedFrames++;
             releaseFrame(frame);
         }
@@ -153,18 +159,20 @@ public final class RecordingController {
     }
 
     public void renderOverlay(Minecraft minecraft, MatrixStack poseStack) {
-        if (state != State.RECORDING) {
+        if (state != State.RECORDING && state != State.PAUSED) {
             return;
         }
 
         long seconds = elapsedSeconds();
-        String text = String.format(Locale.ROOT, "REC %02d:%02d", seconds / 60L, seconds % 60L);
+        boolean paused = state == State.PAUSED;
+        String text = String.format(Locale.ROOT, paused ? "PAUSED %02d:%02d" : "REC %02d:%02d",
+                seconds / 60L, seconds % 60L);
         int boxWidth = minecraft.font.width(text) + 18;
         int x = minecraft.getWindow().getGuiScaledWidth() - boxWidth - 8;
         int y = 8;
 
         AbstractGui.fill(poseStack, x, y, x + boxWidth, y + 14, 0x90000000);
-        AbstractGui.fill(poseStack, x + 5, y + 5, x + 9, y + 9, 0xFFFF3B30);
+        AbstractGui.fill(poseStack, x + 5, y + 5, x + 9, y + 9, paused ? 0xFFFFB020 : 0xFFFF3B30);
         AbstractGui.drawString(poseStack, minecraft.font, text, x + 13, y + 3, 0xFFFFFFFF);
     }
 
@@ -173,11 +181,36 @@ public final class RecordingController {
     }
 
     public long elapsedSeconds() {
-        return Math.max(0L, (System.nanoTime() - startNanos) / 1_000_000_000L);
+        long now = System.nanoTime();
+        long paused = pausedNanos + (state == State.PAUSED ? now - pauseStartedNanos : 0L);
+        return Math.max(0L, (now - startNanos - paused) / 1_000_000_000L);
     }
 
-    private void start(Minecraft minecraft) {
-        if (minecraft.level == null || minecraft.player == null) {
+    /**
+     * Pause or resume the current recording. Paused time is cut out of the
+     * output: capture stops while paused and the frame timestamps handed to the
+     * encoder are shifted back by the paused duration on resume, so the video
+     * continues right where it stopped.
+     */
+    public void togglePause(Minecraft minecraft) {
+        if (state == State.RECORDING) {
+            pauseStartedNanos = System.nanoTime();
+            state = State.PAUSED;
+            clientMessage(minecraft, new TranslationTextComponent("message.simplerecorder.paused"));
+            LOGGER.info("Recording paused");
+        } else if (state == State.PAUSED) {
+            pausedNanos += System.nanoTime() - pauseStartedNanos;
+            pauseStartedNanos = 0L;
+            state = State.RECORDING;
+            nextCaptureNanos = System.nanoTime();
+            clientMessage(minecraft, new TranslationTextComponent("message.simplerecorder.resumed"));
+            LOGGER.info("Recording resumed after {} ms paused", pausedNanos / 1_000_000L);
+        } else if (state == State.EXPORTING) {
+            clientMessage(minecraft, new TranslationTextComponent("message.simplerecorder.busy"));
+        }
+    }
+
+    private void start(Minecraft minecraft) {        if (minecraft.level == null || minecraft.player == null) {
             clientMessage(minecraft, new TranslationTextComponent("message.simplerecorder.no_world"));
             return;
         }
@@ -220,6 +253,8 @@ public final class RecordingController {
         frameHeight = 0;
         capturedFrames = 0;
         droppedFrames = 0;
+        pausedNanos = 0L;
+        pauseStartedNanos = 0L;
         startNanos = System.nanoTime();
         nextCaptureNanos = startNanos;
         warnHighSettings(minecraft);
@@ -247,8 +282,12 @@ public final class RecordingController {
     }
 
     private void stop(Minecraft minecraft, ITextComponent reason) {
-        if (state != State.RECORDING) {
+        if (state != State.RECORDING && state != State.PAUSED) {
             return;
+        }
+        if (state == State.PAUSED) {
+            pausedNanos += System.nanoTime() - pauseStartedNanos;
+            pauseStartedNanos = 0L;
         }
         state = State.EXPORTING;
 
@@ -281,6 +320,8 @@ public final class RecordingController {
         frameHeight = 0;
         capturedFrames = 0;
         droppedFrames = 0;
+        pausedNanos = 0L;
+        pauseStartedNanos = 0L;
 
         if (throwable != null) {
             Throwable cause = throwable instanceof CompletionException && throwable.getCause() != null
@@ -370,6 +411,7 @@ public final class RecordingController {
     private enum State {
         IDLE,
         RECORDING,
+        PAUSED,
         EXPORTING
     }
 }
