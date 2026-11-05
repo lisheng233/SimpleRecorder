@@ -36,10 +36,14 @@ public final class ClientEvents {
     public static final KeyBinding CONFIG_KEY = new KeyBinding(
             "key.simplerecorder.config", Keyboard.KEY_F9, "key.categories.simplerecorder");
 
+    public static final KeyBinding PAUSE_KEY = new KeyBinding(
+            "key.simplerecorder.pause", Keyboard.KEY_F10, "key.categories.simplerecorder");
+
     private static final RecordingController CONTROLLER = new RecordingController();
 
     private static boolean recordHeld;
     private static boolean configHeld;
+    private static boolean pauseHeld;
     private static long lastConfigModified;
     private static long lastConfigSize;
     private static int configWatchTicks;
@@ -65,14 +69,20 @@ public final class ClientEvents {
     private static void pollKeys(Minecraft minecraft) {
         boolean recordDown = isDown(RECORD_KEY);
         boolean configDown = isDown(CONFIG_KEY);
+        boolean pauseDown = isDown(PAUSE_KEY);
 
         boolean recordPressed = recordDown && !recordHeld;
         boolean configPressed = configDown && !configHeld;
+        boolean pausePressed = pauseDown && !pauseHeld;
         recordHeld = recordDown;
         configHeld = configDown;
+        pauseHeld = pauseDown;
 
         if (recordPressed && !(minecraft.currentScreen instanceof GuiControls)) {
             CONTROLLER.toggle(minecraft);
+        }
+        if (pausePressed) {
+            CONTROLLER.togglePause(minecraft);
         }
         if (configPressed) {
             GuiScreen parent = minecraft.currentScreen;
