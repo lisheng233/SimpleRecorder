@@ -62,8 +62,6 @@ config/simplerecorder/avif/<platform>/avifenc[.exe]
 - 下载失败、平台没有官方构建、或文件不可执行时，录制自动回退 **GIF**，聊天栏会显示原因。
 - Android 上 `os.name` 通常也是 `Linux`、架构为 `aarch64`；可提供一个 Android 可执行的 `avifenc` 路径或自定义 zip 下载地址。
 
-> 下载的二进制来自 libavif 官方 release，许可与版权见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
-
 ---
 
 ## 使用
@@ -145,7 +143,7 @@ downloadUrl = ""       # 可选：含 avifenc 的 zip 地址
 
 ### 文件大小
 
-- AVIF 通常比 GIF 小一个数量级；1280×747、30 FPS 的游戏画面常见为 **每秒几 MB 以内**，具体取决于质量和场景复杂度。
+- AVIF 通常比 GIF 小一个数量级；1280×747、30 FPS 的游戏画面常见为 **每秒 1 MB 以内**，具体取决于质量和场景复杂度。
 - GIF 没有现代视频的帧间压缩，1280×747 / 30 FPS 大约 **6–7 MB/s**，录 1 分钟可能到 400 MB。需要长时间录制请优先用 AVIF。
 
 ### 性能与高负载警告
