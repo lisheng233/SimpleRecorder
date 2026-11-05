@@ -41,7 +41,7 @@ public final class GpuYuvConverter {
         int vertex = compile(GL20.GL_VERTEX_SHADER,
                 "#version 120\n"
                         + "void main() {\n"
-                        + "    gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;\n"
+                        + "    gl_Position = vec4(gl_Vertex.xy, 0.0, 1.0);\n"
                         + "    gl_TexCoord[0] = gl_MultiTexCoord0;\n"
                         + "}\n");
         int fragment = compile(GL20.GL_FRAGMENT_SHADER,
@@ -67,7 +67,9 @@ public final class GpuYuvConverter {
         int linked = GL20.glCreateProgram();
         GL20.glAttachShader(linked, vertex);
         GL20.glAttachShader(linked, fragment);
-        GL20.glBindAttribLocation(linked, 0, "gl_Vertex");
+        // Do not call glBindAttribLocation for "gl_Vertex": binding a name that
+        // starts with "gl_" raises GL_INVALID_OPERATION. The compatibility profile
+        // already maps the fixed-function attributes to the built-in names.
         GL20.glLinkProgram(linked);
         GL20.glDeleteShader(vertex);
         GL20.glDeleteShader(fragment);
@@ -132,13 +134,8 @@ public final class GpuYuvConverter {
             GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_S, GL12.GL_CLAMP_TO_EDGE);
             GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_T, GL12.GL_CLAMP_TO_EDGE);
 
-            GL11.glMatrixMode(GL11.GL_PROJECTION);
-            GL11.glPushMatrix();
-            GL11.glLoadIdentity();
-            GL11.glMatrixMode(GL11.GL_MODELVIEW);
-            GL11.glPushMatrix();
-            GL11.glLoadIdentity();
-
+            // The vertex shader writes clip space directly, so the fixed-function
+            // matrices can be left exactly as the game had them.
             GL20.glUseProgram(program);
             GL20.glUniform1i(sourceUniform, 0);
             GL20.glUniform2f(sourceSizeUniform, (float) sourceWidth, (float) sourceHeight);
@@ -155,12 +152,6 @@ public final class GpuYuvConverter {
             GL11.glVertex2f(-1.0F, 1.0F);
             GL11.glEnd();
         } finally {
-            GL11.glMatrixMode(GL11.GL_MODELVIEW);
-            GL11.glPopMatrix();
-            GL11.glMatrixMode(GL11.GL_PROJECTION);
-            GL11.glPopMatrix();
-            GL11.glMatrixMode(GL11.GL_MODELVIEW);
-
             GL20.glUseProgram(previousProgram);
             GL13.glActiveTexture(GL13.GL_TEXTURE0);
             GL11.glBindTexture(GL11.GL_TEXTURE_2D, sourceTexture);
