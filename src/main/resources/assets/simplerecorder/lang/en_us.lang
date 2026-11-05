@@ -1,0 +1,32 @@
+key.categories.simplerecorder=SimpleRecorder
+key.simplerecorder.record=Start / Stop Recording
+key.simplerecorder.config=Open SimpleRecorder Settings
+
+message.simplerecorder.started=Recording started (%s FPS, %s%% size)
+message.simplerecorder.exporting=Stopping recording and exporting...
+message.simplerecorder.saved=Recording saved: %s (%s frames, %s)
+message.simplerecorder.empty=No frames were captured; nothing was written.
+message.simplerecorder.error=Export failed: %s
+message.simplerecorder.capture_error=Frame capture failed: %s
+message.simplerecorder.no_world=Join a world before recording.
+message.simplerecorder.busy=Still exporting the previous recording...
+message.simplerecorder.resize=The window size changed; recording was stopped and exported.
+message.simplerecorder.auto_stop=Left the world; recording was stopped and exported.
+message.simplerecorder.path_error=Could not create the screenshots folder: %s
+message.simplerecorder.fallback=AVIF encoder unavailable (%s); falling back to GIF.
+message.simplerecorder.high_settings=High load settings: %sx%s at %s FPS. Frames may drop; consider 30 FPS / 50%% scale.
+
+screen.simplerecorder.title=SimpleRecorder Settings
+screen.simplerecorder.hint=Changes apply to the next recording. File edits hot-reload.
+screen.simplerecorder.format=Format: %s
+screen.simplerecorder.fps=FPS
+screen.simplerecorder.scale=Scale
+screen.simplerecorder.quality=AVIF Quality
+screen.simplerecorder.speed=AVIF Speed
+screen.simplerecorder.conversion_value=YUV: %s
+screen.simplerecorder.cpu_threads=CPU Threads
+screen.simplerecorder.loop=Loop
+screen.simplerecorder.loop_value=Loop: %s
+screen.simplerecorder.done=Done
+screen.simplerecorder.cancel=Cancel
+screen.simplerecorder.reload=Reload from file

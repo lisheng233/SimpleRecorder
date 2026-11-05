@@ -1,7 +1,9 @@
 package com.lisheng.simplerecorder.config;
 
 import java.io.File;
+import net.minecraftforge.common.config.ConfigCategory;
 import net.minecraftforge.common.config.Configuration;
+import net.minecraftforge.common.config.Property;
 
 /**
  * Client settings.
@@ -55,10 +57,17 @@ public final class RecorderConfig {
 
     public static synchronized void load(File file) {
         configFile = file;
+        boolean existed = file != null && file.isFile();
         Configuration config = new Configuration(file);
         config.load();
         read(config);
         configuration = config;
+        if (!existed) {
+            // 1.12.2 does not create the file on read, so write it once with the
+            // documented defaults and comments.
+            write(config);
+            config.save();
+        }
     }
 
     /**
@@ -91,7 +100,7 @@ public final class RecorderConfig {
         FPS.set(clamp(config.getInt("fps", CATEGORY_OUTPUT, 30, 5, 60,
                 "Capture rate. 30 is the default. Range: 5-60."), 5, 60));
 
-        SCALE.set(clamp(config.get("scale", CATEGORY_OUTPUT, 0.5D,
+        SCALE.set(clamp(config.get(CATEGORY_OUTPUT, "scale", 0.5D,
                 "Output size multiplier. 0.5 means 50% width and 50% height. Range: 0.1-1.0.",
                 0.1D, 1.0D).getDouble(), 0.1D, 1.0D));
 
@@ -121,40 +130,36 @@ public final class RecorderConfig {
                 "Optional zip URL containing avifenc. Overrides the official libavif download for this platform.").trim());
     }
 
+    /**
+     * Pushes the live values back into the properties created by {@link #read}.
+     * Going through the existing {@link Property} keeps the comment, the range and
+     * the valid-value list that {@code read} registered for it.
+     */
     private static void write(Configuration config) {
-        config.get("format", CATEGORY_OUTPUT, OutputFormat.AVIF.name(),
-                "Default container: AVIF (small, modern) or GIF (compatibility fallback).",
-                FORMAT_NAMES).set(FORMAT.get().name());
-        config.get("fps", CATEGORY_OUTPUT, 30,
-                "Capture rate. 30 is the default. Range: 5-60.", 5, 60).set(FPS.get());
-        config.get("scale", CATEGORY_OUTPUT, 0.5D,
-                "Output size multiplier. 0.5 means 50% width and 50% height. Range: 0.1-1.0.", 0.1D, 1.0D)
-                .set(SCALE.get());
-        config.get("loop", CATEGORY_OUTPUT, true,
-                "Loop the exported animation forever.").set(LOOP.get());
-        config.get("warnHighSettings", CATEGORY_OUTPUT, true,
-                "Warn in chat when the estimated capture load is very high.")
-                .set(WARN_HIGH_SETTINGS.get());
-        config.get("quality", CATEGORY_AVIF, 60,
-                "AVIF quality (20-100). 60 is a good size/quality balance for gameplay.", 20, 100)
-                .set(AVIF_QUALITY.get());
-        config.get("speed", CATEGORY_AVIF, 8,
-                "AVIF encoder speed (5-10). Higher is faster and larger. 8 is near real-time.", 5, 10)
-                .set(AVIF_SPEED.get());
-        config.get("conversion", CATEGORY_AVIF, YuvMode.OPENGL.name(),
-                "RGB->YUV conversion: OPENGL (shader, default) or MULTITHREAD (CPU fallback).",
-                CONVERSION_NAMES).set(AVIF_CONVERSION.get().name());
+        set(config, CATEGORY_OUTPUT, "format", FORMAT.get().name());
+        set(config, CATEGORY_OUTPUT, "fps", Integer.toString(FPS.get()));
+        set(config, CATEGORY_OUTPUT, "scale", Double.toString(SCALE.get()));
+        set(config, CATEGORY_OUTPUT, "loop", Boolean.toString(LOOP.get()));
+        set(config, CATEGORY_OUTPUT, "warnHighSettings", Boolean.toString(WARN_HIGH_SETTINGS.get()));
+        set(config, CATEGORY_AVIF, "quality", Integer.toString(AVIF_QUALITY.get()));
+        set(config, CATEGORY_AVIF, "speed", Integer.toString(AVIF_SPEED.get()));
+        set(config, CATEGORY_AVIF, "conversion", AVIF_CONVERSION.get().name());
+        set(config, CATEGORY_AVIF, "cpuThreads", Integer.toString(AVIF_CPU_THREADS.get()));
+        set(config, CATEGORY_AVIF, "encoderPath", AVIF_ENCODER_PATH.get());
+        set(config, CATEGORY_AVIF, "downloadUrl", AVIF_DOWNLOAD_URL.get());
+    }
 
-        int cores = Math.max(1, Runtime.getRuntime().availableProcessors());
-        config.get("cpuThreads", CATEGORY_AVIF, Math.min(4, cores),
-                "CPU conversion threads. Range: 1-" + cores + " (this machine's logical CPU count).", 1, cores)
-                .set(AVIF_CPU_THREADS.get());
-        config.get("encoderPath", CATEGORY_AVIF, "",
-                "Optional path to avifenc. Leave empty to use the cached/downloaded encoder, then PATH.")
-                .set(AVIF_ENCODER_PATH.get());
-        config.get("downloadUrl", CATEGORY_AVIF, "",
-                "Optional zip URL containing avifenc. Overrides the official libavif download for this platform.")
-                .set(AVIF_DOWNLOAD_URL.get());
+    private static void set(Configuration config, String category, String name, String value) {
+        ConfigCategory target = config.getCategory(category);
+        Property property = target.get(name);
+        if (property == null) {
+            return;
+        }
+        try {
+            property.set(value);
+        } catch (RuntimeException ignored) {
+            // A hand-edited out-of-range value stays as the user left it.
+        }
     }
 
     private static <T extends Enum<T>> T readEnum(Configuration config, String name, String category,

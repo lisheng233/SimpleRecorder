@@ -38,8 +38,17 @@ repositories {
     mavenCentral()
 }
 
+// ForgeGradle 3 dev runs discover the mod from the classes output directory and
+// build the in-dev resource pack from it. Writing resources there as well keeps
+// lang files and other assets visible in runClient (the packaged jar is
+// unaffected: it always has both at the root).
+sourceSets.main.output.resourcesDir = sourceSets.main.output.classesDirs.singleFile
+
 dependencies {
-    minecraft 'net.minecraftforge:forge:1.12.2-14.23.5.2860'
+    // 14.23.5.2855 rather than 2860: 2860 crashes during mod construction in this
+    // ForgeGradle 3 dev environment (NetworkRegistry NPE), and 2855 runs fine.
+    // Mods built against 2855 load on 2855 and 2860 clients alike.
+    minecraft 'net.minecraftforge:forge:1.12.2-14.23.5.2855'
     testCompile 'org.junit.jupiter:junit-jupiter-api:5.10.2'
     testCompile 'org.junit.jupiter:junit-jupiter-engine:5.10.2'
     testRuntime 'org.junit.platform:junit-platform-launcher:1.10.2'

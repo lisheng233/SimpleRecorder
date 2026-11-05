@@ -1,0 +1,32 @@
+key.categories.simplerecorder=SimpleRecorder
+key.simplerecorder.record=开始 / 结束录制
+key.simplerecorder.config=打开 SimpleRecorder 设置
+
+message.simplerecorder.started=开始录制（%s FPS，%s%% 尺寸）
+message.simplerecorder.exporting=正在停止录制并导出……
+message.simplerecorder.saved=录制已保存：%s（%s 帧，%s）
+message.simplerecorder.empty=没有捕获到任何帧，未生成文件。
+message.simplerecorder.error=导出失败：%s
+message.simplerecorder.capture_error=画面捕获失败：%s
+message.simplerecorder.no_world=请先进入世界再开始录制。
+message.simplerecorder.busy=上一个录制仍在导出中……
+message.simplerecorder.resize=窗口尺寸发生了变化，已停止录制并导出。
+message.simplerecorder.auto_stop=已离开世界，录制结束并导出。
+message.simplerecorder.path_error=无法创建 screenshots 文件夹：%s
+message.simplerecorder.fallback=AVIF 编码器不可用（%s），已回退到 GIF。
+message.simplerecorder.high_settings=高负载设置：%sx%s @ %s FPS，可能掉帧；建议 30 FPS / 50%% 缩放。
+
+screen.simplerecorder.title=SimpleRecorder 设置
+screen.simplerecorder.hint=改动应用于下一次录制；直接编辑配置文件也会热重载。
+screen.simplerecorder.format=格式：%s
+screen.simplerecorder.fps=帧率
+screen.simplerecorder.scale=缩放
+screen.simplerecorder.quality=AVIF 质量
+screen.simplerecorder.speed=AVIF 速度
+screen.simplerecorder.conversion_value=YUV 转换：%s
+screen.simplerecorder.cpu_threads=CPU 线程数
+screen.simplerecorder.loop=循环
+screen.simplerecorder.loop_value=循环：%s
+screen.simplerecorder.done=完成
+screen.simplerecorder.cancel=取消
+screen.simplerecorder.reload=从文件重新加载
