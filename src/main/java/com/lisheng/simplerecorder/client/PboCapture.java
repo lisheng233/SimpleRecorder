@@ -51,6 +51,7 @@ public final class PboCapture {
     private boolean closed;
     private boolean sizeChanged;
     private boolean errorReported;
+    private boolean reportedStaleGlError;
 
     public PboCapture(double scale, FramePool pool, YuvPool yuvPool,
                       Consumer<ScaledFrame> sink, boolean gpuRequested) {
@@ -103,16 +104,32 @@ public final class PboCapture {
             return false;
         }
 
+        // MC checks glGetError at "Pre render". Clear anything stale first so a
+        // leftover from another renderer is not attributed to our readback.
+        int stale = GL11.glGetError();
+        if (stale != 0 && !reportedStaleGlError) {
+            reportedStaleGlError = true;
+            LOGGER.warn("Discarded stale OpenGL error 0x{} before capture", Integer.toHexString(stale));
+        }
+
         int previousFramebuffer = GL11.glGetInteger(GL30.GL_FRAMEBUFFER_BINDING);
         int previousAlignment = GL11.glGetInteger(GL11.GL_PACK_ALIGNMENT);
         GL11.glPixelStorei(GL11.GL_PACK_ALIGNMENT, 1);
 
+        boolean gpuFrame = gpu;
         try {
             int readWidth;
             int readHeight;
-            if (gpu) {
-                converter.render(target.framebufferTexture, width, height,
-                        slot.targetFbo, dstWidth, dstHeight);
+            if (gpuFrame) {
+                try {
+                    converter.render(target.framebufferTexture, width, height,
+                            slot.targetFbo, dstWidth, dstHeight);
+                } catch (Throwable throwable) {
+                    // A driver that rejects the shader path must not abort the
+                    // recording: drop this frame and keep going on the CPU path.
+                    disableGpu(throwable);
+                    return false;
+                }
                 GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, slot.targetFbo);
                 readWidth = dstWidth;
                 readHeight = dstHeight;
@@ -129,7 +146,7 @@ public final class PboCapture {
             slot.fence = GL32.glFenceSync(GL32.GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
             slot.width = readWidth;
             slot.height = readHeight;
-            slot.gpuFrame = gpu;
+            slot.gpuFrame = gpuFrame;
             slot.timestampNanos = captureNanos;
             slot.state = State.IN_FLIGHT;
             slot.scaled = false;
@@ -143,7 +160,11 @@ public final class PboCapture {
 
         int error = GL11.glGetError();
         if (error != 0) {
-            reportError("glReadPixels failed with OpenGL error " + error);
+            if (gpuFrame) {
+                disableGpu(new IllegalStateException("glReadPixels failed with OpenGL error " + error));
+            } else {
+                reportError("glReadPixels failed with OpenGL error " + error);
+            }
             if (slot.fence != null) {
                 GL32.glDeleteSync(slot.fence);
                 slot.fence = null;
@@ -152,6 +173,47 @@ public final class PboCapture {
             return false;
         }
         return true;
+    }
+
+    /**
+     * Turns the GPU conversion path off for the rest of this recording and drops
+     * the PBO/FBO objects so the next frame is allocated for the CPU path.
+     */
+    private void disableGpu(Throwable cause) {
+        LOGGER.warn("OpenGL YUV conversion failed; continuing with CPU conversion", cause);
+        gpu = false;
+        if (converter != null) {
+            try {
+                converter.close();
+            } catch (Throwable ignored) {
+                // Best-effort cleanup of a half-created converter.
+            }
+            converter = null;
+        }
+        for (Slot slot : slots) {
+            if (slot == null) {
+                continue;
+            }
+            if (slot.fence != null) {
+                GL32.glDeleteSync(slot.fence);
+                slot.fence = null;
+            }
+            if (slot.pbo != 0) {
+                GL15.glDeleteBuffers(slot.pbo);
+                slot.pbo = 0;
+            }
+            if (slot.targetFbo != 0) {
+                GL30.glDeleteFramebuffers(slot.targetFbo);
+                slot.targetFbo = 0;
+            }
+            if (slot.targetTexture != 0) {
+                GL11.glDeleteTextures(slot.targetTexture);
+                slot.targetTexture = 0;
+            }
+            slot.mapped = null;
+            slot.state = State.FREE;
+        }
+        allocated = false;
     }
 
     /**

@@ -30,8 +30,12 @@ public final class GpuYuvConverter {
     private final int program;
     private final int sourceUniform;
     private final int sourceSizeUniform;
-    private final IntBuffer scratch = BufferUtils.createIntBuffer(1);
-    private final IntBuffer viewportScratch = BufferUtils.createIntBuffer(4);
+    // LWJGL 2's BufferChecks require at least 16 elements for every buffer passed
+    // to glGetInteger/glGetTexParameter, no matter how many values the pname
+    // actually returns. A 4-element viewport buffer throws before the GL call is
+    // ever issued, which is what broke the OpenGL YUV path on 1.12.2.
+    private final IntBuffer scratch = BufferUtils.createIntBuffer(16);
+    private final IntBuffer viewportScratch = BufferUtils.createIntBuffer(16);
 
     public GpuYuvConverter() {
         int vertex = compile(GL20.GL_VERTEX_SHADER,
