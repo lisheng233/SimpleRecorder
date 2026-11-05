@@ -34,7 +34,7 @@
 ## 安装
 
 1. 安装 **Minecraft 1.20.1 + Forge 47.3.0 或更高**。
-2. 把 `simplerecorder-1.20.1-0.5.1.jar` 放进客户端的 `mods/` 文件夹。
+2. 把 `simplerecorder-1.20.1-1.0.0.jar` 放进客户端的 `mods/` 文件夹。
 3. 启动游戏。**服务器不需要安装**。
 
 > 这是纯客户端模组，不添加方块、物品、网络包，也不会影响服务器注册表。
@@ -170,7 +170,7 @@ gradlew.bat build
 产物：
 
 ```
-build/libs/simplerecorder-1.20.1-0.5.1.jar
+build/libs/simplerecorder-1.20.1-1.0.0.jar
 ```
 
 只跑单元测试：
