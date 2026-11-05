@@ -61,8 +61,6 @@ config/simplerecorder/avif/<platform>/avifenc[.exe]
 - 已经有本地缓存、PATH 中的 `avifenc`，或配置了 `encoderPath` 时不会重复下载。
 - 下载失败、平台没有官方构建、或文件不可执行时，录制自动回退 **GIF**，聊天栏会显示原因。
 
-> 下载的二进制来自 libavif 官方 release，许可与版权见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
-
 ---
 
 ## 使用
@@ -145,7 +143,7 @@ avif {
 
 ### 文件大小
 
-- AVIF 通常比 GIF 小一个数量级；1280×747、30 FPS 的游戏画面常见为 **每秒几 MB 以内**，具体取决于质量和场景复杂度。
+- AVIF 通常比 GIF 小一个数量级；1280×747、30 FPS 的游戏画面常见为 **每秒 1 MB 以内**，具体取决于质量和场景复杂度。
 - GIF 没有现代视频的帧间压缩，1280×747 / 30 FPS 大约 **6–7 MB/s**，录 1 分钟可能到 400 MB。需要长时间录制请优先用 AVIF。
 
 ### 性能与高负载警告
@@ -218,9 +216,3 @@ src/main/java/com/lisheng/simplerecorder/
 `avifenc` 不在 jar 内；首次启动下载到 `config/simplerecorder/avif/<platform>/`。
 
 ---
-
-## 许可
-
-SimpleRecorder 自身代码：**GPL-3.0-only**，详见 [LICENSE](LICENSE)。
-
-运行时下载的 `avifenc` 来自 libavif 官方发行版，静态链接了 libavif、AOM、dav1d、libyuv、libjpeg-turbo、libpng、zlib 等组件；它们的许可与版权声明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
