@@ -14,25 +14,29 @@ import java.nio.ByteOrder;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import org.slf4j.Logger;
 
 /**
- * Asynchronous frame readback on the 26.3 GPU abstraction.
+ * Non-blocking frame readback for Minecraft 26.3.
  *
- * <p>Minecraft 26.3 renders through {@code com.mojang.renderpearl} and can run
- * on either the OpenGL or the Vulkan backend. There is no portable
- * {@code glReadPixels} in that world — raw GL only exists on the OpenGL
- * backend — so this class does exactly what vanilla's screenshot code does:
- * {@code CommandEncoder.copyTextureToBuffer} into a CPU-visible
- * {@code GpuBuffer}, then map that buffer once the copy has completed. Both
- * backends implement those two calls, so one code path covers OpenGL and
- * Vulkan.</p>
+ * <p>26.3 renders through {@code com.mojang.renderpearl} and may run on the
+ * OpenGL or the Vulkan backend, so raw {@code glReadPixels} is off the table.
+ * The copy is issued with {@code CommandEncoder.copyTextureToBuffer} and the
+ * result is read straight out of a <em>persistently mapped</em> buffer:</p>
  *
- * <p>A small ring of buffers keeps the render thread ahead of the GPU: frame N
- * issues a copy, frame N+1 maps the finished buffer while frame N+1's copy runs.
- * The expensive part (flip + downscale + RGB, or the YUV conversion done by the
- * encoder) happens on a worker thread, never on the render thread.</p>
+ * <ul>
+ *   <li>each slot maps its buffer once at allocation, so no {@code map()} call
+ *       (a potential driver stall) happens per frame;</li>
+ *   <li>the render thread only records the copy and submits it, it never waits
+ *       for the GPU and never touches the pixel data;</li>
+ *   <li>when the copy's completion callback fires, the buffer is handed to a
+ *       worker thread which scales it straight out of the mapped memory into a
+ *       pooled pixel array (no intermediate copy, no heap churn);</li>
+ *   <li>if all slots are busy the frame is simply dropped — capture never blocks
+ *       the render thread.</li>
+ * </ul>
  */
 public final class FrameCapture {
     private static final Logger LOGGER = LogUtils.getLogger();
@@ -45,6 +49,7 @@ public final class FrameCapture {
     private final ExecutorService scaler;
 
     private final Slot[] slots = new Slot[SLOT_COUNT];
+    private final AtomicInteger busy = new AtomicInteger();
 
     private int width;
     private int height;
@@ -53,6 +58,15 @@ public final class FrameCapture {
     private boolean closed;
     private boolean sizeChanged;
     private boolean errorReported;
+
+    // Diagnostics: microseconds spent on the render thread.
+    private long captureNanos;
+    private long encoderNanos;
+    private long recordNanos;
+    private long submitNanos;
+    private long captureCalls;
+    private long framesCopied;
+    private long framesSkipped;
 
     public FrameCapture(double scale, FramePool pool, YuvPool yuvPool, Consumer<ScaledFrame> sink) {
         this.scale = scale;
@@ -71,10 +85,10 @@ public final class FrameCapture {
     }
 
     /**
-     * Queues one readback of the render target. Must run on the render thread,
-     * after the frame has been submitted and before the target is cleared.
+     * Records one readback of the render target. Must run on the render thread.
      *
-     * @return {@code false} when every slot is still busy or the target changed size
+     * @return {@code false} when the frame was skipped (all slots busy, target
+     *         resized, or the device rejected the copy)
      */
     public boolean capture(RenderTarget target, long captureNanos) {
         if (closed || target == null || target.width <= 0 || target.height <= 0) {
@@ -99,47 +113,56 @@ public final class FrameCapture {
             allocate(device, target, colorTexture);
         }
 
+        if (busy.get() >= SLOT_COUNT) {
+            framesSkipped++;
+            return false;
+        }
+
         Slot slot = freeSlot();
         if (slot == null) {
+            framesSkipped++;
             return false;
         }
 
+        long start = System.nanoTime();
         try {
+            slot.state = State.COPYING;
+            slot.ready = false;
+            slot.timestampNanos = captureNanos;
+            slot.pixelsRef = null;
+            long t0 = System.nanoTime();
             CommandEncoder encoder = device.createCommandEncoder();
-            // The completion callback runs once the GPU work is done; from then
-            // on the buffer may be mapped on the render thread.
+            long t1 = System.nanoTime();
             encoder.copyTextureToBuffer(colorTexture, slot.buffer, 0L, slot::markReady, 0);
+            long t2 = System.nanoTime();
             encoder.submit();
+            long t3 = System.nanoTime();
+            encoderNanos += t1 - t0;
+            recordNanos += t2 - t1;
+            submitNanos += t3 - t2;
+            busy.incrementAndGet();
+            framesCopied++;
         } catch (Throwable throwable) {
+            slot.state = State.FREE;
             reportError("GPU frame copy failed: " + throwable);
             return false;
+        } finally {
+            this.captureNanos += System.nanoTime() - start;
+            this.captureCalls++;
         }
-
-        slot.state = State.COPYING;
-        slot.ready = false;
-        slot.timestampNanos = captureNanos;
         return true;
     }
 
-    /** Advances the ring: maps finished copies and delivers scaled frames. */
+    /** Advances the ring. Only cheap bookkeeping happens on the render thread. */
     public void poll() {
         if (closed) {
             return;
         }
         for (Slot slot : slots) {
-            switch (slot.state) {
-                case COPYING -> {
-                    if (slot.ready) {
-                        mapAndScale(slot);
-                    }
-                }
-                case SCALING -> {
-                    if (slot.scaled) {
-                        finishScaling(slot);
-                    }
-                }
-                default -> {
-                }
+            if (slot.state == State.COPYING && slot.ready) {
+                dispatch(slot);
+            } else if (slot.state == State.SCALING && slot.done) {
+                finishScaling(slot);
             }
         }
     }
@@ -160,18 +183,27 @@ public final class FrameCapture {
         return height;
     }
 
+    /** Render-thread microseconds per capture call and per copied frame. */
+    public String stats() {
+        if (captureCalls == 0L) {
+            return "no capture calls";
+        }
+        double scale = 1.0D / ((double) captureCalls * 1000.0D);
+        return String.format(java.util.Locale.ROOT,
+                "render-thread capture avg %.0f us/call (encoder %.0f, record %.0f, submit %.0f) over %d calls, %d frames copied, %d skipped",
+                captureNanos * scale, encoderNanos * scale, recordNanos * scale, submitNanos * scale,
+                captureCalls, framesCopied, framesSkipped);
+    }
+
     public void close() {
         if (closed) {
             return;
         }
         closed = true;
-        poll();
         scaler.shutdown();
         try {
             if (!scaler.awaitTermination(5L, TimeUnit.SECONDS)) {
-                // Leaking the buffers is safer than unmapping memory the worker
-                // may still be reading.
-                LOGGER.warn("Frame scaler did not stop; leaking its GPU buffers");
+                LOGGER.warn("Frame scaler did not stop; leaking its GPU buffers instead of unmapping in use");
                 return;
             }
         } catch (InterruptedException exception) {
@@ -183,18 +215,26 @@ public final class FrameCapture {
                 releaseFrame(slot.frame);
                 slot.frame = null;
             }
-            slot.ready = false;
-            slot.scaled = false;
             slot.state = State.FREE;
+            slot.ready = false;
             if (slot.mapped != null) {
-                slot.mapped.close();
+                try {
+                    slot.mapped.close();
+                } catch (Throwable ignored) {
+                    // Nothing sensible to do while shutting down.
+                }
                 slot.mapped = null;
             }
             if (slot.buffer != null) {
-                slot.buffer.close();
+                try {
+                    slot.buffer.close();
+                } catch (Throwable ignored) {
+                    // Nothing sensible to do while shutting down.
+                }
                 slot.buffer = null;
             }
         }
+        busy.set(0);
         allocated = false;
     }
 
@@ -207,7 +247,9 @@ public final class FrameCapture {
         if (size <= 0L) {
             throw new IllegalStateException("Main render target has an empty colour texture");
         }
-        int usage = GpuBuffer.USAGE_COPY_DST | GpuBuffer.USAGE_MAP_READ;
+        int usage = GpuBuffer.USAGE_COPY_DST
+                | GpuBuffer.USAGE_MAP_READ
+                | GpuBuffer.USAGE_HINT_CLIENT_STORAGE;
         for (Slot slot : slots) {
             if (slot.mapped != null) {
                 slot.mapped.close();
@@ -217,16 +259,19 @@ public final class FrameCapture {
                 slot.buffer.close();
             }
             slot.buffer = device.createBuffer(() -> "SimpleRecorder frame", usage, size);
-            slot.pixels = new byte[(int) size];
+            // Mapped once for the lifetime of the slot: no per-frame map/unmap,
+            // which is where a driver would otherwise stall the render thread.
+            slot.mapped = slot.buffer.map(true, false);
+            slot.data = slot.mapped.data().order(ByteOrder.LITTLE_ENDIAN);
             slot.state = State.FREE;
             slot.ready = false;
-            slot.scaled = false;
             slot.frame = null;
             slot.error = null;
+            slot.pixelsRef = null;
         }
         allocated = true;
-        LOGGER.info("Capture target {}x{} {} ({} bytes/pixel, {} backend)", width, height, format,
-                bytesPerPixel, GpuCapabilities.backendName());
+        LOGGER.info("Capture target {}x{} {} ({} bytes/pixel, {} backend, {} MB per slot)", width, height, format,
+                bytesPerPixel, GpuCapabilities.backendName(), (size / (1024 * 1024)));
     }
 
     private Slot freeSlot() {
@@ -238,59 +283,33 @@ public final class FrameCapture {
         return null;
     }
 
-    private void mapAndScale(Slot slot) {
+    private void dispatch(Slot slot) {
         slot.state = State.SCALING;
-        slot.scaled = false;
         slot.frame = null;
         slot.error = null;
-
-        ByteBuffer view;
-        try {
-            GpuBufferSlice.MappedView mapped = slot.buffer.map(true, false);
-            slot.mapped = mapped;
-            view = mapped.data().order(ByteOrder.LITTLE_ENDIAN);
-            // Copy out of the mapped memory now: the mapping is released on the
-            // render thread as soon as the worker has its private copy.
-            view.get(0, slot.pixels, 0, slot.pixels.length);
-        } catch (Throwable throwable) {
-            slot.error = throwable;
-            slot.scaled = true;
-            slot.ready = false;
-            return;
-        } finally {
-            if (slot.mapped != null) {
-                try {
-                    slot.mapped.close();
-                } catch (Throwable ignored) {
-                    // Closing a mapped view should not fail; nothing to do if it does.
-                }
-                slot.mapped = null;
-            }
-        }
-        slot.ready = false;
-
-        byte[] pixels = slot.pixels;
         int frameWidth = width;
         int frameHeight = height;
         long timestamp = slot.timestampNanos;
+        ByteBuffer data = slot.data;
         try {
             scaler.execute(() -> {
                 int outputSize = FrameScaler.scaledWidth(frameWidth, scale)
                         * FrameScaler.scaledHeight(frameHeight, scale);
                 int[] output = pool.acquire(outputSize);
                 try {
-                    slot.frame = FrameScaler.scaleRgbaBottomUp(ByteBuffer.wrap(pixels), frameWidth, frameHeight,
-                            scale, output, timestamp);
+                    slot.pixelsRef = output;
+                    slot.frame = FrameScaler.scaleRgbaBottomUp(data, frameWidth, frameHeight, scale, output, timestamp);
                 } catch (Throwable throwable) {
                     pool.release(output);
+                    slot.frame = null;
                     slot.error = throwable;
                 } finally {
-                    slot.scaled = true;
+                    slot.done = true;
                 }
             });
         } catch (RuntimeException exception) {
-            // Executor already shutting down.
             slot.state = State.FREE;
+            busy.decrementAndGet();
         }
     }
 
@@ -299,8 +318,10 @@ public final class FrameCapture {
         Throwable error = slot.error;
         slot.frame = null;
         slot.error = null;
-        slot.scaled = false;
+        slot.done = false;
+        slot.pixelsRef = null;
         slot.state = State.FREE;
+        busy.decrementAndGet();
 
         if (error != null) {
             reportError("Frame scaling failed: " + error);
@@ -341,10 +362,11 @@ public final class FrameCapture {
     private static final class Slot {
         GpuBuffer buffer;
         GpuBufferSlice.MappedView mapped;
-        byte[] pixels;
+        ByteBuffer data;
+        int[] pixelsRef;
         long timestampNanos;
         volatile boolean ready;
-        volatile boolean scaled;
+        volatile boolean done;
         volatile ScaledFrame frame;
         volatile Throwable error;
         volatile State state = State.FREE;

@@ -27,6 +27,7 @@
   "screen.simplerecorder.format_arg": "Format: %s",
   "screen.simplerecorder.fps_arg": "FPS: %s",
   "screen.simplerecorder.scale_arg": "Scale: %s",
+  "screen.simplerecorder.scale_percent_arg": "Scale: %s%%",
   "screen.simplerecorder.quality_arg": "AVIF Quality: %s",
   "screen.simplerecorder.speed_arg": "AVIF Speed: %s",
   "screen.simplerecorder.conversion_arg": "YUV Conversion: %s",
@@ -34,5 +35,6 @@
   "screen.simplerecorder.loop_arg": "Loop: %s",
   "screen.simplerecorder.backend_arg": "Preferred Backend: %s",
   "screen.simplerecorder.backend_note": "The renderer is picked at launch; the preference is only checked and reported.",
+  "screen.simplerecorder.indicator_arg": "REC badge while recording: %s",
   "screen.simplerecorder.done": "Done"
 }

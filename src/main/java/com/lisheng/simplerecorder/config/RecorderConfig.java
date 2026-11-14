@@ -33,6 +33,7 @@ public final class RecorderConfig {
     public static final String KEY_ENCODER_PATH = "avif.encoderPath";
     public static final String KEY_DOWNLOAD_URL = "avif.downloadUrl";
     public static final String KEY_BACKEND = "capture.backend";
+    public static final String KEY_INDICATOR = "output.indicatorInRecording";
 
     private static final Properties PROPS = new Properties();
     private static long loadedStamp = Long.MIN_VALUE;
@@ -90,6 +91,7 @@ public final class RecorderConfig {
         defaults.setProperty(KEY_ENCODER_PATH, "");
         defaults.setProperty(KEY_DOWNLOAD_URL, "");
         defaults.setProperty(KEY_BACKEND, "auto");
+        defaults.setProperty(KEY_INDICATOR, "false");
         try (OutputStream out = Files.newOutputStream(path)) {
             defaults.store(out, "SimpleRecorder client settings. Edits apply to the next recording.");
         }
@@ -180,6 +182,18 @@ public final class RecorderConfig {
 
     public static String avifDownloadUrl() {
         return raw(KEY_DOWNLOAD_URL, "");
+    }
+
+    /**
+     * Draw the REC badge while recording.
+     *
+     * <p>26.3 composites the whole GUI pass into the target the recorder reads,
+     * so a badge drawn during a recording is part of the exported frames. Off by
+     * default; the paused badge is always drawn because paused frames are not
+     * captured.</p>
+     */
+    public static boolean indicatorInRecording() {
+        return boolValue(KEY_INDICATOR, false);
     }
 
     /** {@code auto}, {@code opengl} or {@code vulkan}: only used for diagnostics. */

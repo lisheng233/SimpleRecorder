@@ -27,6 +27,7 @@
   "screen.simplerecorder.format_arg": "输出格式：%s",
   "screen.simplerecorder.fps_arg": "帧率：%s",
   "screen.simplerecorder.scale_arg": "缩放：%s",
+  "screen.simplerecorder.scale_percent_arg": "缩放：%s%%",
   "screen.simplerecorder.quality_arg": "AVIF 质量：%s",
   "screen.simplerecorder.speed_arg": "AVIF 速度：%s",
   "screen.simplerecorder.conversion_arg": "YUV 转换：%s",
@@ -34,5 +35,6 @@
   "screen.simplerecorder.loop_arg": "循环播放：%s",
   "screen.simplerecorder.backend_arg": "首选渲染后端：%s",
   "screen.simplerecorder.backend_note": "渲染后端在启动时决定，该选项只用于核对并在不匹配时提示。",
+  "screen.simplerecorder.indicator_arg": "录制中显示 REC 角标：%s",
   "screen.simplerecorder.done": "完成"
 }

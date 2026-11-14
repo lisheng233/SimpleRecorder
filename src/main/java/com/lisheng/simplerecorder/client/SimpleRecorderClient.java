@@ -72,11 +72,105 @@ public final class SimpleRecorderClient implements ClientModInitializer {
         CONTROLLER.tick(minecraft);
     }
 
+    // --- frame timing / self test -------------------------------------------------
+
+    private static long lastFrameNanos;
+    private static long idleFrames;
+    private static long idleNanos;
+    private static long recordFrames;
+    private static long recordNanos;
+    private static long autoTestStart;
+    private static int autoTestPhase;
+    private static long autoTestPhaseAt;
+
     /** Called from {@code Minecraft#renderFrame} after the frame has been presented. */
     public static void onFrameRendered() {
-        CONTROLLER.onFrameRendered(Minecraft.getInstance());
+        Minecraft minecraft = Minecraft.getInstance();
+        long now = System.nanoTime();
+        if (lastFrameNanos != 0L) {
+            long delta = now - lastFrameNanos;
+            if (CONTROLLER.isRecording()) {
+                recordFrames++;
+                recordNanos += delta;
+            } else if (idleFrames < 400L) {
+                idleFrames++;
+                idleNanos += delta;
+            }
+        }
+        lastFrameNanos = now;
+
+        CONTROLLER.onFrameRendered(minecraft);
+        maybeAutoTest(minecraft, now);
     }
 
+    /**
+     * Development aid: {@code -Dsimplerecorder.autotest=<seconds>} starts a
+     * recording after three seconds and stops it after the given duration, then
+     * logs the frame rate before and during the recording. Used to measure the
+     * capture overhead without a human holding F8.
+     */
+    /** True when the self test is enabled ({@code -Dsimplerecorder.autotest} or env var). */
+    public static boolean isAutoTest() {
+        return System.getProperty("simplerecorder.autotest") != null
+                || System.getenv("SIMPLERECORDER_AUTOTEST") != null;
+    }
+
+    private static void maybeAutoTest(Minecraft minecraft, long now) {
+        String seconds = System.getProperty("simplerecorder.autotest");
+        if (seconds == null) {
+            seconds = System.getenv("SIMPLERECORDER_AUTOTEST");
+        }
+        if (seconds == null) {
+            return;
+        }
+        long duration = Long.parseLong(seconds) * 1_000_000_000L;
+        if (autoTestStart == 0L) {
+            autoTestStart = now;
+            autoTestPhaseAt = now;
+            return;
+        }
+        long elapsed = now - autoTestStart;
+        switch (autoTestPhase) {
+            case 0 -> {
+                if (elapsed > 3_000_000_000L) {
+                    autoTestPhase = 1;
+                    autoTestPhaseAt = now;
+                    CONTROLLER.toggle(minecraft);
+                }
+            }
+            case 1 -> {
+                if (now - autoTestPhaseAt > duration) {
+                    autoTestPhase = 2;
+                    autoTestPhaseAt = now;
+                    CONTROLLER.toggle(minecraft);
+                    double idleFps = idleNanos == 0L ? 0.0D
+                            : 1.0E9D / ((double) idleNanos / Math.max(1L, idleFrames));
+                    double recordFps = recordNanos == 0L ? 0.0D
+                            : 1.0E9D / ((double) recordNanos / Math.max(1L, recordFrames));
+                    LOGGER.info("AUTOTEST idle={} frames avg {} fps | recording={} frames avg {} fps",
+                            idleFrames, String.format(java.util.Locale.ROOT, "%.1f", idleFps),
+                            recordFrames, String.format(java.util.Locale.ROOT, "%.1f", recordFps));
+                }
+            }
+            case 2 -> {
+                if (now - autoTestPhaseAt > 2_000_000_000L) {
+                    autoTestPhase = 3;
+                    autoTestPhaseAt = now;
+                    minecraft.setScreenAndShow(new RecorderConfigScreen(null));
+                    LOGGER.info("AUTOTEST opened the settings screen");
+                }
+            }
+            case 3 -> {
+                if (now - autoTestPhaseAt > 2_000_000_000L) {
+                    autoTestPhase = 4;
+                    minecraft.setScreenAndShow(null);
+                    LOGGER.info("AUTOTEST closed the settings screen");
+                }
+            }
+            default -> {
+            }
+        }
+    }
     public static RecordingController controller() {
         return CONTROLLER;
     }

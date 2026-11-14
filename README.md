@@ -31,13 +31,36 @@
 
 实测（2026-11）：RTX 5070 Ti Laptop，OpenGL 3.3 与 Vulkan 1.4.357 两个后端都能正常录制，导出 GIF 与动画 AVIF。
 
-### 抓帧时机
+### 抓帧：时机与开销
 
-`Minecraft#renderFrame` 在最后 `submit()` + `present()` 之后，主渲染目标里是一帧完整的画面（含 HUD）。模组用 Mixin 在这个点抓帧，之后才画自己的录制指示器，所以：
+`Minecraft#renderFrame` 在最后 `submit()` + `present()` 之后，主渲染目标里是一帧完整的画面。模组用 Mixin 在这个点抓帧，**不阻塞渲染线程**：
 
-- 抓到的画面包含世界、HUD、其他模组 overlay；
-- 录制中右上角的 `● REC mm:ss` **不会**出现在输出文件里；
-- 同一份代码在 Vulkan 上不会出现「只有 GUI 没世界」或「抓上一帧」的问题。
+- 每个槽位的 `GpuBuffer` 在分配时**一次性持久映射**（`USAGE_MAP_READ | COPY_DST | HINT_CLIENT_STORAGE`），之后每帧不再调用 `map()`；
+- 渲染线程每帧只做三件事：`createCommandEncoder`（约 1 µs）、`copyTextureToBuffer`（约 70 µs）、`submit`（约 150 µs）；
+- 拷贝完成回调置位后，槽位交给 Worker 线程，**直接从映射内存里做翻转 + 缩放**，渲染线程既不 memcpy 也不等 GPU；
+- 3 个槽位轮转，全忙就丢这一帧（计入 dropped），**永不阻塞**。
+
+实测（854×480 窗口，Vulkan，30 FPS 录制，14 秒）：
+
+```
+render-thread capture avg 216 us/call (encoder 1, record 70, submit 143)
+  over 450 calls, 450 frames copied, 0 skipped
+recording: 59.7 FPS
+```
+
+上一版实现是每帧 `map()` + 在渲染线程上 memcpy 整帧，实测约 **1.9 ms/帧**；现在是 **约 0.2 ms/帧**，并且渲染线程完全不碰像素数据。
+
+### 录制指示器为什么默认只在暂停时显示
+
+26.3 把世界渲染、后处理、GUI 全部画进**同一个目标**，而这个目标就是我们读回的那张纹理；模组没有「在这帧 GUI 画完之前插入一次快照」的入口（OpenGL 后端还能插入即时命令，Vulkan 后端不行）。所以只要在录制中把 `REC` 角标画进屏幕，它就一定会出现在输出文件里。
+
+默认行为：
+
+- **录制中不画角标**（状态靠聊天栏提示）；
+- **暂停时画 `PAUSED mm:ss`**——暂停期间不抓帧，画什么都安全；
+- 想恢复常驻角标可以设 `output.indicatorInRecording=true`，代价是角标会进画面。
+
+录制内容本身仍然包含完整 HUD（血条、物品栏、Jade/WTHIT 等），因为抓的就是合成后的帧。
 
 ---
 
@@ -49,9 +72,9 @@
 - 默认 **AVIF** 动画，**30 FPS**、**50% 宽度 × 50% 高度**、无限循环。
 - AVIF 不可用时自动回退 **GIF**，并在聊天栏说明原因。
 - 配置支持热重载：直接编辑 `config/simplerecorder.properties`，下一次录制立即生效。
-- 录制时右上角显示红点 + `REC mm:ss`，这个指示器不会出现在输出文件里。
+- 录制中不画角标（状态靠聊天栏提示），暂停时显示 `PAUSED mm:ss`；可用 `output.indicatorInRecording` 换回常驻角标（会进画面）。
 - 高负载设置警告：估算像素吞吐过高时在聊天栏提示可能掉帧。
-- 异步 GPU 回读：3 个 GPU buffer 轮转，渲染线程只负责提交拷贝，缩放和编码在后台线程。
+- 异步 GPU 回读：3 个持久映射的 GPU buffer 轮转，渲染线程每帧只花约 0.2 ms 提交拷贝，缩放和编码在后台线程。
 - 首次启动自动下载官方 `avifenc`（最长 1 分钟），之后缓存复用；不把第三方二进制打进 jar。
 - 编码队列满时丢新帧，不会卡住游戏。
 - 窗口尺寸变化、退出世界时自动停止并导出。
@@ -94,7 +117,7 @@ config/simplerecorder/avif/<platform>/avifenc[.exe]
 
 ## 设置
 
-按 **F9** 打开设置界面，每个按钮点一下切换到下一个取值。也可以直接编辑 `config/simplerecorder.properties`（改完下一次录制生效）：
+按 **F9** 打开设置界面：帧率、缩放、AVIF 质量、AVIF 速度、CPU 线程数都是**滑块**（拖动即可），输出格式 / 循环 / YUV 转换 / 首选后端 / 角标是点击切换的按钮。也可以直接编辑 `config/simplerecorder.properties`（改完下一次录制生效）：
 
 ```properties
 output.format=AVIF            # AVIF 或 GIF
@@ -109,6 +132,7 @@ avif.cpuThreads=4             # 1-本机逻辑 CPU 数
 avif.encoderPath=             # 手动指定 avifenc
 avif.downloadUrl=             # 自定义下载地址
 capture.backend=auto          # auto / opengl / vulkan，仅用于核对与提示
+output.indicatorInRecording=false  # true 时录制中也画 REC 角标（会进画面）
 ```
 
 - `avif.conversion=OPENGL` 是 1.21.x 时代「用 GLSL 着色器做 RGB→YUV」的开关。26.3 的渲染后端可能是 Vulkan，那条路径已经不存在，设为 `OPENGL` 会自动降级为多线程 CPU 转换，并在聊天栏提示一次。

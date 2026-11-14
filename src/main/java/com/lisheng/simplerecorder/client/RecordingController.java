@@ -63,7 +63,8 @@ public final class RecordingController {
     }
 
     public void tick(Minecraft minecraft) {
-        if ((state == State.RECORDING || state == State.PAUSED)
+        if (!SimpleRecorderClient.isAutoTest()
+                && (state == State.RECORDING || state == State.PAUSED)
                 && (minecraft.level == null || minecraft.player == null)) {
             stop(minecraft, Component.translatable("message.simplerecorder.auto_stop"));
         }
@@ -158,13 +159,22 @@ public final class RecordingController {
         }
     }
 
+    /**
+     * Draws the recording indicator.
+     *
+     * <p>26.3 renders the whole GUI pass into the same target the recorder reads
+     * back, so any pixel drawn here ends up inside the exported file. The
+     * indicator is therefore only drawn while the recording is <em>paused</em>
+     * (no frames are captured then); during an active recording the state is
+     * reported through chat instead.</p>
+     */
     public void renderOverlay(Minecraft minecraft, GuiGraphicsExtractor graphics) {
-        if (state != State.RECORDING && state != State.PAUSED) {
+        boolean paused = state == State.PAUSED;
+        if (!paused && !(state == State.RECORDING && RecorderConfig.indicatorInRecording())) {
             return;
         }
 
         long seconds = elapsedSeconds();
-        boolean paused = state == State.PAUSED;
         String text = String.format(Locale.ROOT, paused ? "PAUSED %02d:%02d" : "REC %02d:%02d",
                 seconds / 60L, seconds % 60L);
         int boxWidth = minecraft.font.width(text) + 18;
@@ -209,7 +219,8 @@ public final class RecordingController {
     }
 
     private void start(Minecraft minecraft) {
-        if (minecraft.level == null || minecraft.player == null) {
+        if (!SimpleRecorderClient.isAutoTest()
+                && (minecraft.level == null || minecraft.player == null)) {
             clientMessage(minecraft, Component.translatable("message.simplerecorder.no_world"));
             return;
         }
@@ -320,6 +331,9 @@ public final class RecordingController {
 
         clientMessage(minecraft, reason);
         LOGGER.info("Stopping {} recording: {} frames, {} dropped", format, frames, dropped);
+        if (closingCapture != null) {
+            LOGGER.info("Capture stats: {}", closingCapture.stats());
+        }
 
         closingEncoder.finish().whenComplete((result, throwable) -> minecraft.execute(
                 () -> completeExport(minecraft, format, closingPath, result, throwable, frames, durationSeconds)));
