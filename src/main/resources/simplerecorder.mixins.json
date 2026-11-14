@@ -1,0 +1,12 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.lisheng.simplerecorder.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "MinecraftFrameCaptureMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

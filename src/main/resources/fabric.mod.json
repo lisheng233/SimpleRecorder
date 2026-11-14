@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "id": "simplerecorder",
+  "version": "${version}",
+  "name": "SimpleRecorder",
+  "description": "Client-side screen recorder: press F8 to record and export an animated AVIF (GIF fallback). Works on both the OpenGL and the Vulkan renderer of Minecraft 26.3.",
+  "authors": ["lisheng233"],
+  "license": "GPL-3.0-only",
+  "icon": "assets/simplerecorder/icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "main": ["com.lisheng.simplerecorder.SimpleRecorder"],
+    "client": ["com.lisheng.simplerecorder.client.SimpleRecorderClient"]
+  },
+  "mixins": [
+    "simplerecorder.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.19.5",
+    "minecraft": "~26.3",
+    "java": ">=25",
+    "fabric-api": ">=0.160.5"
+  },
+  "contact": {
+    "homepage": "https://github.com/lisheng233/SimpleRecorder",
+    "sources": "https://github.com/lisheng233/SimpleRecorder"
+  }
+}
