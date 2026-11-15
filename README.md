@@ -117,7 +117,7 @@ config/simplerecorder/avif/<platform>/avifenc[.exe]
 
 ## 设置
 
-按 **F9** 打开设置界面：帧率、缩放、AVIF 质量、AVIF 速度、CPU 线程数都是**滑块**（拖动即可），输出格式 / 循环 / YUV 转换 / 首选后端 / 角标是点击切换的按钮。也可以直接编辑 `config/simplerecorder.properties`（改完下一次录制生效）：
+按 **F9** 打开设置界面：帧率、缩放、AVIF 质量、AVIF 速度、CPU 线程数都是**滑块**（拖动即可），输出格式 / 循环 / 转换方式（CPU、GPU）/ 首选后端 / 角标是点击切换的按钮。也可以直接编辑 `config/simplerecorder.properties`（改完下一次录制生效）：
 
 ```properties
 output.format=AVIF            # AVIF 或 GIF
@@ -127,7 +127,7 @@ output.loop=true
 output.warnHighSettings=true
 avif.quality=60               # 20-100
 avif.speed=8                  # 5-10
-avif.conversion=MULTITHREAD   # 26.3 只支持 CPU 转换，见下
+avif.convert=CPU              # CPU 或 GPU，见下
 avif.cpuThreads=4             # 1-本机逻辑 CPU 数
 avif.encoderPath=             # 手动指定 avifenc
 avif.downloadUrl=             # 自定义下载地址
@@ -135,7 +135,9 @@ capture.backend=auto          # auto / opengl / vulkan，仅用于核对与提�
 output.indicatorInRecording=false  # true 时录制中也画 REC 角标（会进画面）
 ```
 
-- `avif.conversion=OPENGL` 是 1.21.x 时代「用 GLSL 着色器做 RGB→YUV」的开关。26.3 的渲染后端可能是 Vulkan，那条路径已经不存在，设为 `OPENGL` 会自动降级为多线程 CPU 转换，并在聊天栏提示一次。
+- `avif.convert` 只有两个取值：`CPU`（多线程转换，默认）和 `GPU`。选 `GPU` 时具体用哪个图形 API 由**运行中的渲染后端**决定（也就是设置界面里「首选渲染后端」那一项显示的值），模组不再单独提供 OPENGL 这种写法。
+  当前 26.3 版本**尚未实现** GPU 转换路径（需要自建 `RenderPipeline` + 着色器，且要在 OpenGL 与 Vulkan 两个后端上分别验证），选 `GPU` 会在聊天栏提示一次并回退 CPU。
+- 旧配置里的 `avif.conversion`（`MULTITHREAD` / `OPENGL`）会自动迁移到 `avif.convert=CPU`。
 - `capture.backend` **不会**在运行时切换后端（后端在启动时由游戏决定），填了和实际不符时只会提示一次；抓帧本身对两种后端都适用。
 
 ### 已知限制

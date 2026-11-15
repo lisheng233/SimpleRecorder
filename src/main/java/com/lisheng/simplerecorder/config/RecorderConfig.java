@@ -28,7 +28,9 @@ public final class RecorderConfig {
     public static final String KEY_WARN_HIGH = "output.warnHighSettings";
     public static final String KEY_QUALITY = "avif.quality";
     public static final String KEY_SPEED = "avif.speed";
-    public static final String KEY_CONVERSION = "avif.conversion";
+    public static final String KEY_CONVERT = "avif.convert";
+    /** Legacy key, read once for migration. */
+    public static final String KEY_CONVERT_LEGACY = "avif.conversion";
     public static final String KEY_CPU_THREADS = "avif.cpuThreads";
     public static final String KEY_ENCODER_PATH = "avif.encoderPath";
     public static final String KEY_DOWNLOAD_URL = "avif.downloadUrl";
@@ -85,7 +87,7 @@ public final class RecorderConfig {
         defaults.setProperty(KEY_WARN_HIGH, "true");
         defaults.setProperty(KEY_QUALITY, "60");
         defaults.setProperty(KEY_SPEED, "8");
-        defaults.setProperty(KEY_CONVERSION, "MULTITHREAD");
+        defaults.setProperty(KEY_CONVERT, ConvertMode.CPU.name());
         defaults.setProperty(KEY_CPU_THREADS, String.valueOf(Math.min(4, Math.max(1,
                 Runtime.getRuntime().availableProcessors()))));
         defaults.setProperty(KEY_ENCODER_PATH, "");
@@ -157,18 +159,19 @@ public final class RecorderConfig {
     }
 
     /**
-     * {@code OPENGL} asks for shader-side RGB to YUV conversion. 26.3 runs on
-     * either the OpenGL or the Vulkan backend, and the shader conversion was an
-     * OpenGL-only path, so this port always converts on the CPU and reports the
-     * downgrade once instead of silently doing the wrong thing.
+     * Where the RGB to YUV conversion runs: {@code CPU} or {@code GPU}.
+     *
+     * <p>When GPU is selected the concrete graphics API is the one the game is
+     * running on (the preferred backend shown next to this option), not a value
+     * this mod picks.</p>
      */
-    public static YuvMode yuvMode() {
-        String value = raw(KEY_CONVERSION, YuvMode.MULTITHREAD.name());
-        try {
-            return YuvMode.valueOf(value.toUpperCase(java.util.Locale.ROOT));
-        } catch (IllegalArgumentException ignored) {
-            return YuvMode.MULTITHREAD;
+    public static ConvertMode convertMode() {
+        ensureLoaded();
+        String value = PROPS.getProperty(KEY_CONVERT);
+        if (value == null || value.isBlank()) {
+            value = PROPS.getProperty(KEY_CONVERT_LEGACY, ConvertMode.CPU.name());
         }
+        return ConvertMode.fromString(value);
     }
 
     public static int avifCpuThreads() {

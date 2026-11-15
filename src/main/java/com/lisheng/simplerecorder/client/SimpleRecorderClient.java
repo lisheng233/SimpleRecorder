@@ -2,7 +2,7 @@ package com.lisheng.simplerecorder.client;
 
 import com.lisheng.simplerecorder.config.OutputFormat;
 import com.lisheng.simplerecorder.config.RecorderConfig;
-import com.lisheng.simplerecorder.config.YuvMode;
+import com.lisheng.simplerecorder.config.ConvertMode;
 import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.logging.LogUtils;
 import net.fabricmc.api.ClientModInitializer;
@@ -178,9 +178,9 @@ public final class SimpleRecorderClient implements ClientModInitializer {
     /** Used by the settings screen to show what the current settings will do. */
     public static String describeState() {
         String backend = GpuCapabilities.backendName();
-        YuvMode mode = RecorderConfig.yuvMode();
-        String conversion = mode == YuvMode.OPENGL
-                ? "CPU (GPU shader conversion is not available on 26.3)"
+        ConvertMode mode = RecorderConfig.convertMode();
+        String conversion = mode == ConvertMode.GPU
+                ? "GPU (" + backend + ") -> CPU fallback, not implemented yet"
                 : "CPU (" + RecorderConfig.avifCpuThreads() + " threads)";
         return "Backend: " + backend + "  |  Conversion: " + conversion
                 + "  |  Format: " + RecorderConfig.format()

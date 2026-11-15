@@ -4,7 +4,7 @@ import com.lisheng.simplerecorder.avif.AvifEncoder;
 import com.lisheng.simplerecorder.avif.AvifSupport;
 import com.lisheng.simplerecorder.config.OutputFormat;
 import com.lisheng.simplerecorder.config.RecorderConfig;
-import com.lisheng.simplerecorder.config.YuvMode;
+import com.lisheng.simplerecorder.config.ConvertMode;
 import com.lisheng.simplerecorder.encode.RecordingEncoder;
 import com.lisheng.simplerecorder.encode.RecordingResult;
 import com.lisheng.simplerecorder.gif.GifEncoder;
@@ -48,7 +48,7 @@ public final class RecordingController {
     private int capturedFrames;
     private int droppedFrames;
     private boolean warnedHigh;
-    private boolean warnedYuvDowngrade;
+    private boolean warnedGpuConversion;
     private long startNanos;
     private long nextCaptureNanos;
     private long pausedNanos;
@@ -240,11 +240,13 @@ public final class RecordingController {
             clientMessage(minecraft, Component.translatable("message.simplerecorder.fallback", reason));
         }
 
-        if (!warnedYuvDowngrade && RecorderConfig.yuvMode() == YuvMode.OPENGL) {
-            warnedYuvDowngrade = true;
-            clientMessage(minecraft, Component.translatable("message.simplerecorder.yuv_cpu_only",
+        if (!warnedGpuConversion && RecorderConfig.convertMode() == ConvertMode.GPU) {
+            warnedGpuConversion = true;
+            // A real GPU pass needs a custom RenderPipeline + shader in 26.3; this
+            // build has no such pipeline yet, so say so instead of pretending.
+            clientMessage(minecraft, Component.translatable("message.simplerecorder.gpu_conversion_fallback",
                     GpuCapabilities.backendName()));
-            LOGGER.info("avif.conversion=OPENGL is not available on 26.3 ({} backend); using CPU conversion",
+            LOGGER.warn("avif.convert=GPU is not implemented yet on 26.3 ({} backend); using CPU conversion",
                     GpuCapabilities.backendName());
         }
 

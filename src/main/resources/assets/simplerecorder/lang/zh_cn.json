@@ -20,7 +20,7 @@
   "message.simplerecorder.path_error": "无法创建 screenshots 文件夹：%s",
   "message.simplerecorder.fallback": "AVIF 编码器不可用（%s），改用 GIF。",
   "message.simplerecorder.high_settings": "设置负载较高：%sx%s、%s FPS，可能掉帧，建议 30 FPS / 50% 缩放。",
-  "message.simplerecorder.yuv_cpu_only": "26.3 下 avif.conversion=OPENGL 不可用（当前 %s 渲染后端），已改用多线程 CPU 转换。",
+  "message.simplerecorder.gpu_conversion_fallback": "26.3 下 avif.convert=GPU 暂未实现（当前 %s 渲染后端），已改用多线程 CPU 转换。",
 
   "screen.simplerecorder.title": "SimpleRecorder 设置",
   "screen.simplerecorder.hint": "改动会在下一次录制时生效；直接编辑配置文件修改后也会重新加载。",
@@ -30,7 +30,7 @@
   "screen.simplerecorder.scale_percent_arg": "缩放：%s%%",
   "screen.simplerecorder.quality_arg": "AVIF 质量：%s",
   "screen.simplerecorder.speed_arg": "AVIF 速度：%s",
-  "screen.simplerecorder.conversion_arg": "YUV 转换：%s",
+  "screen.simplerecorder.convert_arg": "转换方式：%s",
   "screen.simplerecorder.cpu_threads_arg": "CPU 线程：%s",
   "screen.simplerecorder.loop_arg": "循环播放：%s",
   "screen.simplerecorder.backend_arg": "首选渲染后端：%s",

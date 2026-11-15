@@ -20,7 +20,7 @@
   "message.simplerecorder.path_error": "Could not create the screenshots folder: %s",
   "message.simplerecorder.fallback": "AVIF encoder unavailable (%s); falling back to GIF.",
   "message.simplerecorder.high_settings": "High load settings: %sx%s at %s FPS. Frames may drop; consider 30 FPS / 50% scale.",
-  "message.simplerecorder.yuv_cpu_only": "avif.conversion=OPENGL is not available on 26.3 (%s renderer); using multithreaded CPU conversion instead.",
+  "message.simplerecorder.gpu_conversion_fallback": "avif.convert=GPU is not implemented yet on 26.3 (%s renderer); using multithreaded CPU conversion instead.",
 
   "screen.simplerecorder.title": "SimpleRecorder Settings",
   "screen.simplerecorder.hint": "Changes apply to the next recording. Hand edits of the properties file also reload.",
@@ -30,7 +30,7 @@
   "screen.simplerecorder.scale_percent_arg": "Scale: %s%%",
   "screen.simplerecorder.quality_arg": "AVIF Quality: %s",
   "screen.simplerecorder.speed_arg": "AVIF Speed: %s",
-  "screen.simplerecorder.conversion_arg": "YUV Conversion: %s",
+  "screen.simplerecorder.convert_arg": "Convert: %s",
   "screen.simplerecorder.cpu_threads_arg": "CPU Threads: %s",
   "screen.simplerecorder.loop_arg": "Loop: %s",
   "screen.simplerecorder.backend_arg": "Preferred Backend: %s",

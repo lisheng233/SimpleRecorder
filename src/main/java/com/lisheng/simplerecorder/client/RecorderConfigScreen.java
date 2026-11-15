@@ -2,7 +2,7 @@ package com.lisheng.simplerecorder.client;
 
 import com.lisheng.simplerecorder.config.OutputFormat;
 import com.lisheng.simplerecorder.config.RecorderConfig;
-import com.lisheng.simplerecorder.config.YuvMode;
+import com.lisheng.simplerecorder.config.ConvertMode;
 import java.util.Locale;
 import java.util.function.IntConsumer;
 import java.util.function.IntSupplier;
@@ -77,12 +77,12 @@ public final class RecorderConfigScreen extends Screen {
                 }));
 
         addRenderableWidget(cycle(left, top + 3 * step,
-                () -> Component.translatable("screen.simplerecorder.conversion_arg",
-                        RecorderConfig.yuvMode().name()),
+                () -> Component.translatable("screen.simplerecorder.convert_arg",
+                        RecorderConfig.convertMode().displayName()),
                 () -> {
-                    YuvMode next = RecorderConfig.yuvMode() == YuvMode.OPENGL
-                            ? YuvMode.MULTITHREAD : YuvMode.OPENGL;
-                    RecorderConfig.set(RecorderConfig.KEY_CONVERSION, next.name());
+                    ConvertMode next = RecorderConfig.convertMode() == ConvertMode.GPU
+                            ? ConvertMode.CPU : ConvertMode.GPU;
+                    RecorderConfig.set(RecorderConfig.KEY_CONVERT, next.name());
                 }));
 
         addRenderableWidget(cycle(right, top + 3 * step,
